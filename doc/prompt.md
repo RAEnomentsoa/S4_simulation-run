@@ -30,5 +30,5 @@ scenario:
 
     rule: if capacity of scceleration /second is 15 km/s the accelerate 15 km /s 
 
-    NB:note that  simulation of the car moving is moving according to scene and time , be realistic with the cslculations
+    NB:note that  simulation of the car moving is moving according to scene and time , be realistic with the calculations
 
