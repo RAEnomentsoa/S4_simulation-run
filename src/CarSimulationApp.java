@@ -3,9 +3,29 @@ import java.awt.*;
 import java.awt.event.*;
 import java.io.*;
 import java.text.DecimalFormat;
-import java.util.Properties;
+import java.util.ArrayList;
+import java.util.List;
 
 public class CarSimulationApp extends JFrame {
+    static class Car {
+        int id;
+        String name;
+        double acceleration;
+        double maxSpeed;
+
+        public Car(int id, String name, double acceleration, double maxSpeed) {
+            this.id = id;
+            this.name = name;
+            this.acceleration = acceleration;
+            this.maxSpeed = maxSpeed;
+        }
+
+        @Override
+        public String toString() {
+            return name + " (" + maxSpeed + " km/h max)";
+        }
+    }
+
     private static final int TARGET_DISTANCE = 400; // 400 meters
     private static final int FPS = 50; // frames per second for smooth simulation
     private static final double DT = 1.0 / FPS; // time step in seconds
@@ -20,6 +40,7 @@ public class CarSimulationApp extends JFrame {
     private boolean isTimerRunning = false;
 
     // Config state
+    private List<Car> availableCars = new ArrayList<>();
     private double maxSpeedKmH = 200.0; // default max speed
     private double accelerationKmHS = 15.0; // default acceleration in km/h per second
     private boolean isHoldingAccelerate = false;
@@ -30,6 +51,7 @@ public class CarSimulationApp extends JFrame {
     private SpeedometerPanel speedometerPanel;
     private JLabel timerLabel;
     private JLabel resultLabel;
+    private JComboBox<Car> carSelector;
     private JButton startBtn;
     private JButton stopBtn;
     private JButton resetBtn;
@@ -66,6 +88,17 @@ public class CarSimulationApp extends JFrame {
         timerLabel = new JLabel("Time: -5.00 s");
         timerLabel.setFont(new Font("Arial", Font.BOLD, 20));
         leftPanel.add(timerLabel);
+
+        leftPanel.add(Box.createVerticalStrut(10));
+        leftPanel.add(new JLabel("Select Car:"));
+        carSelector = new JComboBox<>(availableCars.toArray(new Car[0]));
+        carSelector.addActionListener(e -> {
+            Car selected = (Car) carSelector.getSelectedItem();
+            if (selected != null) {
+                selectCar(selected);
+            }
+        });
+        leftPanel.add(carSelector);
 
         startBtn = new JButton("Start");
         stopBtn = new JButton("Stop");
@@ -108,23 +141,50 @@ public class CarSimulationApp extends JFrame {
         File configFile = new File("car_config.txt");
         if (!configFile.exists()) {
             try (PrintWriter out = new PrintWriter(configFile)) {
-                out.println("acceleration=15");
-                out.println("max_speed=200");
+                out.println("1,ferrari,15,200");
+                out.println("2,porsche,20,250");
+                out.println("3,nissan,12,180");
             } catch (IOException e) {
                 e.printStackTrace();
             }
         }
 
         try (BufferedReader reader = new BufferedReader(new FileReader(configFile))) {
-            Properties props = new Properties();
-            props.load(reader);
-            accelerationKmHS = Double.parseDouble(props.getProperty("acceleration", "15.0"));
-            maxSpeedKmH = Double.parseDouble(props.getProperty("max_speed", "200.0"));
-            System.out.println("Loaded config - Max Speed: " + maxSpeedKmH + " km/h, Acceleration: " + accelerationKmHS
-                    + " km/h/s");
+            String line;
+            while ((line = reader.readLine()) != null) {
+                line = line.trim();
+                if (line.isEmpty() || line.startsWith("#")) {
+                    continue;
+                }
+                String[] parts = line.split(",");
+                if (parts.length >= 4) {
+                    try {
+                        int id = Integer.parseInt(parts[0].trim());
+                        String name = parts[1].trim();
+                        double accel = Double.parseDouble(parts[2].trim());
+                        double maxSpeed = Double.parseDouble(parts[3].trim());
+                        availableCars.add(new Car(id, name, accel, maxSpeed));
+                    } catch (NumberFormatException e) {
+                        System.err.println("Skipping invalid line: " + line);
+                    }
+                }
+            }
         } catch (Exception e) {
             System.err.println("Failed to load config, using defaults.");
         }
+
+        if (availableCars.isEmpty()) {
+            availableCars.add(new Car(1, "ferrari", 15, 200));
+        }
+        selectCar(availableCars.get(0));
+    }
+
+    private void selectCar(Car car) {
+        this.accelerationKmHS = car.acceleration;
+        this.maxSpeedKmH = car.maxSpeed;
+        System.out.println(
+                "Selected " + car.name + " - Max Speed: " + maxSpeedKmH + " km/h, Acceleration: " + accelerationKmHS
+                        + " km/h/s");
     }
 
     private void setupListeners() {
@@ -240,7 +300,7 @@ public class CarSimulationApp extends JFrame {
 
             g2d.setColor(Color.BLACK);
             g2d.drawString("Start", startX - 15, height / 2 + 25);
-            g2d.drawString("400m Finish", startX + trackLength - 30, height / 2 + 25);
+            g2d.drawString(TARGET_DISTANCE + "m Finish", startX + trackLength - 30, height / 2 + 25);
 
             // Draw Car
             int carX = startX + (int) (progress * trackLength);
