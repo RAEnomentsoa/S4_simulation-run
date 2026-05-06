@@ -303,10 +303,22 @@ public class CarSimulationApp extends JFrame {
             if (distance >= TARGET_DISTANCE) {
                 distance = TARGET_DISTANCE;
                 hasFinished = true;
+                saveRaceResults();
             }
         }
 
         updateUIState();
+    }
+
+    private void saveRaceResults() {
+        try (PrintWriter writer = new PrintWriter(new FileWriter("resultats.txt", true))) {
+            Car selectedCar = (Car) carSelector.getSelectedItem();
+            String carName = selectedCar != null ? selectedCar.name : "Unknown Car";
+            writer.println("Name: " + carName + ", Distance: " + TARGET_DISTANCE + "m, Time: "
+                    + timeDf.format(carRaceTime) + "s, Max Speed: " + maxSpeedKmH + " km/h");
+        } catch (IOException e) {
+            System.err.println("Error saving results: " + e.getMessage());
+        }
     }
 
     private void updateUIState() {
@@ -578,8 +590,9 @@ public class CarSimulationApp extends JFrame {
             g2d.fillRect(tripBoxX, tripBoxY, tripBoxW, tripBoxH);
 
             g2d.setColor(new Color(200, 200, 200));
-        
-            String tripText = String.format("%04.1f", (displayDistance / (double) TARGET_DISTANCE) * 10.0).replace(".", " ");
+
+            String tripText = String.format("%04.1f", (displayDistance / (double) TARGET_DISTANCE) * 10.0).replace(".",
+                    " ");
             int tripTextW = odoFm.stringWidth(tripText);
             g2d.drawString(tripText, centerX - tripTextW / 2,
                     tripBoxY + odoFm.getAscent() + (tripBoxH - odoFm.getHeight()) / 2);
