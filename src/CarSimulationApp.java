@@ -55,7 +55,7 @@ public class CarSimulationApp extends JFrame {
     private JButton accelerateBtn;
 
     private Timer gameLoop;
-    private DecimalFormat timeDf = new DecimalFormat("0.00");
+    private DecimalFormat timeDf = new DecimalFormat("0.000");
 
     // Color scheme
     private static final Color PRIMARY_COLOR = new Color(0, 242, 204); // Bright cyan
