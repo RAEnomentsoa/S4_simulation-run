@@ -1,4 +1,4 @@
 # Format: id, name, acceleration, maxSpeed, nosCapacity, nosConsumption, nosBoost
-1,ferrari,100,500,1,15,100
+1,ferrari,10,800,1,15,10
 2,porsche,20,250,80,20,15
 3,nissan,12,180,150,10,8

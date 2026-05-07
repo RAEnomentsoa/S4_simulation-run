@@ -10,3 +10,6 @@ Name: ferrari, Distance: 400m, Time: 5.183s, Max Speed: 500.0 km/h
 Name: ferrari, Distance: 400m, Time: 5.083s, Max Speed: 500.0 km/h
 Name: ferrari, Distance: 400m, Time: 4.517s, Max Speed: 500.0 km/h
 Name: ferrari, Distance: 400m, Time: 5.300s, Max Speed: 500.0 km/h
+Name: ferrari, Distance: 4000m, Time: 30.733s, Max Speed: 500.0 km/h
+Name: ferrari, Distance: 400m, Time: 3.700s, Max Speed: 5000.0 km/h
+Name: ferrari, Distance: 400m, Time: 3.850s, Max Speed: 800.0 km/h

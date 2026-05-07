@@ -34,7 +34,7 @@ public class CarSimulationApp extends JFrame {
         }
     }
 
-    private static final int TARGET_DISTANCE = 400; // 400 meters
+    private int targetDistance = 400; // 400 meters
     private static final int FPS = 60; // frames per second for smooth simulation
     private static final double DT = 1.0 / FPS; // time step in seconds
 
@@ -58,7 +58,7 @@ public class CarSimulationApp extends JFrame {
     private double currentNos = 0.0;
     private boolean isHoldingNos = false;
     private double accumulatedNosBoost = 0.0;
-    
+
     // Real-time stat
     private double currentActualAccel = 0.0;
 
@@ -193,6 +193,50 @@ public class CarSimulationApp extends JFrame {
             }
         });
         panel.add(carSelector);
+
+        panel.add(Box.createVerticalStrut(20));
+
+        JLabel distLabel = new JLabel("RACE DISTANCE (m)");
+        distLabel.setFont(new Font("Arial", Font.BOLD, 12));
+        distLabel.setForeground(PRIMARY_COLOR);
+        distLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
+        panel.add(distLabel);
+        panel.add(Box.createVerticalStrut(5));
+
+        JTextField distInput = new JTextField(String.valueOf(targetDistance));
+        distInput.setMaximumSize(new Dimension(180, 30));
+        distInput.setBackground(DARK_BG);
+        distInput.setForeground(Color.WHITE);
+        distInput.setCaretColor(Color.WHITE);
+        distInput.setHorizontalAlignment(JTextField.CENTER);
+        distInput.setToolTipText("Press Enter to apply");
+        distInput.addActionListener(e -> {
+            try {
+                int newDist = Integer.parseInt(distInput.getText().trim());
+                if (newDist > 0) {
+                    targetDistance = newDist;
+                    // Reset state for new distance
+                    isTimerRunning = false;
+                    timerValue = -5.0;
+                    distance = 0.0;
+                    speedMpS = 0.0;
+                    carRaceTime = 0.0;
+                    hasFinished = false;
+                    isHoldingAccelerate = false;
+                    accumulatedNosBoost = 0.0;
+                    currentActualAccel = 0.0;
+                    if (carSelector.getSelectedItem() != null) {
+                        currentNos = ((Car) carSelector.getSelectedItem()).capacityNos;
+                    }
+                    updateUIState();
+                } else {
+                    distInput.setText(String.valueOf(targetDistance));
+                }
+            } catch (NumberFormatException ex) {
+                distInput.setText(String.valueOf(targetDistance));
+            }
+        });
+        panel.add(distInput);
 
         // Accelerate Button
         panel.add(Box.createVerticalStrut(20));
@@ -346,7 +390,7 @@ public class CarSimulationApp extends JFrame {
 
                 // convert acceleration from km/h per second to m/s^2
                 double accelerationMpS2 = currentAccelKmHS * (1000.0 / 3600.0);
-                
+
                 double maxSpeedMpS = maxSpeedKmH * (1000.0 / 3600.0);
                 if (speedMpS < maxSpeedMpS) {
                     currentActualAccel = currentAccelKmHS;
@@ -378,8 +422,8 @@ public class CarSimulationApp extends JFrame {
             distance += speedMpS * DT;
 
             // Check finish line
-            if (distance >= TARGET_DISTANCE) {
-                distance = TARGET_DISTANCE;
+            if (distance >= targetDistance) {
+                distance = targetDistance;
                 hasFinished = true;
                 saveRaceResults();
             }
@@ -392,7 +436,7 @@ public class CarSimulationApp extends JFrame {
         try (PrintWriter writer = new PrintWriter(new FileWriter("resultats.txt", true))) {
             Car selectedCar = (Car) carSelector.getSelectedItem();
             String carName = selectedCar != null ? selectedCar.name : "Unknown Car";
-            writer.println("Name: " + carName + ", Distance: " + TARGET_DISTANCE + "m, Time: "
+            writer.println("Name: " + carName + ", Distance: " + targetDistance + "m, Time: "
                     + timeDf.format(carRaceTime) + "s, Max Speed: " + maxSpeedKmH + " km/h");
         } catch (IOException e) {
             System.err.println("Error saving results: " + e.getMessage());
@@ -400,7 +444,7 @@ public class CarSimulationApp extends JFrame {
     }
 
     private void updateUIState() {
-        trackPanel.setCarPosition(distance / TARGET_DISTANCE);
+        trackPanel.setCarPosition(distance / targetDistance);
         trackPanel.repaint();
 
         double currentSpeedKmH = speedMpS * 3.6; // convert m/s to km/h
@@ -459,7 +503,7 @@ public class CarSimulationApp extends JFrame {
             g2d.setColor(PRIMARY_COLOR);
             g2d.setFont(new Font("Arial", Font.BOLD, 12));
             g2d.drawString("START", startX - 30, height / 2 - 35);
-            g2d.drawString(TARGET_DISTANCE + "m", startX + trackLength - 30, height / 2 - 35);
+            g2d.drawString(targetDistance + "m", startX + trackLength - 30, height / 2 - 35);
 
             // Draw Car with enhanced style
             int carX = startX + (int) (progress * trackLength);
@@ -503,13 +547,13 @@ public class CarSimulationApp extends JFrame {
     class DashboardPanel extends JPanel {
         private String timerText = "Time: -5.00 s";
         private String raceText = "Ready...";
-        private String distanceText = "0/" + TARGET_DISTANCE + " m";
+        private String distanceText = "0/400 m";
         private double nosPercentage = 0.0;
 
         public void updateDashboard(double timerValue, double carRaceTime, double currentNos, boolean finished,
                 DecimalFormat format) {
             timerText = "Time: " + format.format(timerValue) + " s";
-            distanceText = (int) distance + "/" + TARGET_DISTANCE + " m";
+            distanceText = (int) distance + "/" + targetDistance + " m";
 
             Car c = (Car) carSelector.getSelectedItem();
             if (c != null) {
@@ -581,7 +625,7 @@ public class CarSimulationApp extends JFrame {
             g2d.setColor(PRIMARY_COLOR);
             g2d.setFont(new Font("Arial", Font.PLAIN, 11));
             g2d.drawString("Max: " + (int) maxSpeedKmH + " km/h", 15, 290);
-            
+
             // Real-time acceleration display
             if (currentActualAccel > accelerationKmHS) {
                 g2d.setColor(new Color(255, 120, 0)); // Highlight orange when using NOS
@@ -591,21 +635,21 @@ public class CarSimulationApp extends JFrame {
                 g2d.setColor(PRIMARY_COLOR);
             }
             g2d.drawString(String.format("Accel: %.1f km/h/s", currentActualAccel), 15, 310);
-            
+
             // NOS Progress Bar
             g2d.setColor(PRIMARY_COLOR);
             g2d.setFont(new Font("Arial", Font.BOLD, 14));
             g2d.drawString("NOS", 15, 345);
-            
+
             int barX = 55;
             int barY = 333;
             int barW = width - barX - 15;
             int barH = 14;
-            
+
             // Background
             g2d.setColor(new Color(60, 60, 60));
             g2d.fillRoundRect(barX, barY, barW, barH, 5, 5);
-            
+
             // Fill
             if (nosPercentage > 0) {
                 g2d.setColor(new Color(255, 120, 0)); // NOS color
@@ -712,7 +756,7 @@ public class CarSimulationApp extends JFrame {
 
             g2d.setColor(new Color(200, 200, 200));
 
-            String tripText = String.format("%04.1f", (displayDistance / (double) TARGET_DISTANCE) * 10.0).replace(".",
+            String tripText = String.format("%04.1f", (displayDistance / (double) targetDistance) * 10.0).replace(".",
                     " ");
             int tripTextW = odoFm.stringWidth(tripText);
             g2d.drawString(tripText, centerX - tripTextW / 2,
