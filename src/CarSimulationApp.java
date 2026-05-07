@@ -13,12 +13,19 @@ public class CarSimulationApp extends JFrame {
         String name;
         double acceleration;
         double maxSpeed;
+        double capacityNos;
+        double consumptionNos;
+        double nosBoost;
 
-        public Car(int id, String name, double acceleration, double maxSpeed) {
+        public Car(int id, String name, double acceleration, double maxSpeed, double capacityNos, double consumptionNos,
+                double nosBoost) {
             this.id = id;
             this.name = name;
             this.acceleration = acceleration;
             this.maxSpeed = maxSpeed;
+            this.capacityNos = capacityNos;
+            this.consumptionNos = consumptionNos;
+            this.nosBoost = nosBoost;
         }
 
         @Override
@@ -46,6 +53,14 @@ public class CarSimulationApp extends JFrame {
     private double accelerationKmHS = 15.0; // default acceleration in km/h per second
     private boolean isHoldingAccelerate = false;
     private boolean hasFinished = false;
+
+    // NOS state
+    private double currentNos = 0.0;
+    private boolean isHoldingNos = false;
+    private double accumulatedNosBoost = 0.0;
+    
+    // Real-time stat
+    private double currentActualAccel = 0.0;
 
     // UI Components
     private TrackPanel trackPanel;
@@ -148,6 +163,9 @@ public class CarSimulationApp extends JFrame {
             carRaceTime = 0.0;
             hasFinished = false;
             isHoldingAccelerate = false;
+            if (carSelector.getSelectedItem() != null) {
+                currentNos = ((Car) carSelector.getSelectedItem()).capacityNos;
+            }
             dashboardPanel.updateDashboard(timerValue, carRaceTime, hasFinished);
         });
         panel.add(resetBtn);
@@ -208,9 +226,10 @@ public class CarSimulationApp extends JFrame {
         File configFile = new File("car_config.txt");
         if (!configFile.exists()) {
             try (PrintWriter out = new PrintWriter(configFile)) {
-                out.println("1,ferrari,15,200");
-                out.println("2,porsche,20,250");
-                out.println("3,nissan,12,180");
+                out.println("# Format: id, name, acceleration, maxSpeed, nosCapacity, nosConsumption, nosBoost");
+                out.println("1,ferrari,15,200,100,15,10");
+                out.println("2,porsche,20,250,80,20,15");
+                out.println("3,nissan,12,180,150,10,8");
             } catch (IOException e) {
                 e.printStackTrace();
             }
@@ -224,13 +243,16 @@ public class CarSimulationApp extends JFrame {
                     continue;
                 }
                 String[] parts = line.split(",");
-                if (parts.length >= 4) {
+                if (parts.length >= 7) {
                     try {
                         int id = Integer.parseInt(parts[0].trim());
                         String name = parts[1].trim();
                         double accel = Double.parseDouble(parts[2].trim());
                         double maxSpeed = Double.parseDouble(parts[3].trim());
-                        availableCars.add(new Car(id, name, accel, maxSpeed));
+                        double capacityNos = Double.parseDouble(parts[4].trim());
+                        double consumptionNos = Double.parseDouble(parts[5].trim());
+                        double nosBoost = Double.parseDouble(parts[6].trim());
+                        availableCars.add(new Car(id, name, accel, maxSpeed, capacityNos, consumptionNos, nosBoost));
                     } catch (NumberFormatException e) {
                         System.err.println("Skipping invalid line: " + line);
                     }
@@ -241,7 +263,7 @@ public class CarSimulationApp extends JFrame {
         }
 
         if (availableCars.isEmpty()) {
-            availableCars.add(new Car(1, "ferrari", 15, 200));
+            availableCars.add(new Car(1, "ferrari", 15, 200, 100, 15, 10));
         }
         selectCar(availableCars.get(0));
     }
@@ -249,6 +271,7 @@ public class CarSimulationApp extends JFrame {
     private void selectCar(Car car) {
         this.accelerationKmHS = car.acceleration;
         this.maxSpeedKmH = car.maxSpeed;
+        this.currentNos = car.capacityNos;
         System.out.println(
                 "Selected " + car.name + " - Max Speed: " + maxSpeedKmH + " km/h, Acceleration: " + accelerationKmHS
                         + " km/h/s");
@@ -268,6 +291,24 @@ public class CarSimulationApp extends JFrame {
                 accelerateBtn.setBackground(SECONDARY_COLOR);
             }
         });
+
+        // NOS Key Bindings
+        InputMap inputMap = trackPanel.getInputMap(JComponent.WHEN_IN_FOCUSED_WINDOW);
+        ActionMap actionMap = trackPanel.getActionMap();
+
+        inputMap.put(KeyStroke.getKeyStroke(KeyEvent.VK_N, 0, false), "nosDown");
+        actionMap.put("nosDown", new AbstractAction() {
+            public void actionPerformed(ActionEvent e) {
+                isHoldingNos = true;
+            }
+        });
+
+        inputMap.put(KeyStroke.getKeyStroke(KeyEvent.VK_N, 0, true), "nosUp");
+        actionMap.put("nosUp", new AbstractAction() {
+            public void actionPerformed(ActionEvent e) {
+                isHoldingNos = false;
+            }
+        });
     }
 
     private void updatePhysics() {
@@ -283,16 +324,53 @@ public class CarSimulationApp extends JFrame {
                 carRaceTime += DT;
             }
 
+            Car selectedCar = (Car) carSelector.getSelectedItem();
+            boolean nosActive = isHoldingNos && isHoldingAccelerate && currentNos > 0 && selectedCar != null;
+
+            if (nosActive) {
+                double consumptionPerSec = selectedCar.consumptionNos / 60.0; // convert kg/min to kg/s
+                currentNos -= consumptionPerSec * DT;
+                if (currentNos < 0)
+                    currentNos = 0;
+            }
+
             // Apply acceleration if button is held
             if (isHoldingAccelerate) {
-                // convert acceleration from km/h per second to m/s^2
-                double accelerationMpS2 = accelerationKmHS * (1000.0 / 3600.0);
-                speedMpS += accelerationMpS2 * DT;
+                double currentAccelKmHS = accelerationKmHS;
+                if (nosActive) {
+                    accumulatedNosBoost += selectedCar.nosBoost * DT; // Increase acceleration over time
+                    currentAccelKmHS += accumulatedNosBoost;
+                } else {
+                    accumulatedNosBoost = 0.0;
+                }
 
-                // cap at max speed
+                // convert acceleration from km/h per second to m/s^2
+                double accelerationMpS2 = currentAccelKmHS * (1000.0 / 3600.0);
+                
+                double maxSpeedMpS = maxSpeedKmH * (1000.0 / 3600.0);
+                if (speedMpS < maxSpeedMpS) {
+                    currentActualAccel = currentAccelKmHS;
+                    speedMpS += accelerationMpS2 * DT;
+                    if (speedMpS > maxSpeedMpS) {
+                        speedMpS = maxSpeedMpS;
+                    }
+                } else {
+                    currentActualAccel = 0.0;
+                    speedMpS = maxSpeedMpS;
+                }
+            } else {
+                accumulatedNosBoost = 0.0;
                 double maxSpeedMpS = maxSpeedKmH * (1000.0 / 3600.0);
                 if (speedMpS > maxSpeedMpS) {
-                    speedMpS = maxSpeedMpS;
+                    double decelerationKmHS = accelerationKmHS * 2;
+                    double decelerationMpS2 = decelerationKmHS * (1000.0 / 3600.0);
+                    currentActualAccel = -decelerationKmHS;
+                    speedMpS -= decelerationMpS2 * DT;
+                    if (speedMpS < maxSpeedMpS) {
+                        speedMpS = maxSpeedMpS;
+                    }
+                } else {
+                    currentActualAccel = 0.0;
                 }
             }
 
@@ -329,7 +407,7 @@ public class CarSimulationApp extends JFrame {
         speedometerPanel.setSpeed(currentSpeedKmH);
         speedometerPanel.setDistance(distance);
         speedometerPanel.repaint();
-        dashboardPanel.updateDashboard(timerValue, carRaceTime, hasFinished, timeDf);
+        dashboardPanel.updateDashboard(timerValue, carRaceTime, currentNos, hasFinished, timeDf);
     }
 
     // Inner class for the top track view with modern styling
@@ -409,9 +487,14 @@ public class CarSimulationApp extends JFrame {
             g2d.fillOval(x - 26, y + 12, 12, 12);
             g2d.fillOval(x + 14, y + 12, 12, 12);
 
-            // Neon outline
-            g2d.setColor(PRIMARY_COLOR);
-            g2d.setStroke(new BasicStroke(2));
+            // Neon outline - change to orange if NOS is flaming
+            if (isHoldingNos && isHoldingAccelerate && currentNos > 0) {
+                g2d.setColor(new Color(255, 120, 0));
+                g2d.setStroke(new BasicStroke(3));
+            } else {
+                g2d.setColor(PRIMARY_COLOR);
+                g2d.setStroke(new BasicStroke(2));
+            }
             g2d.draw(carBody);
         }
     }
@@ -421,10 +504,18 @@ public class CarSimulationApp extends JFrame {
         private String timerText = "Time: -5.00 s";
         private String raceText = "Ready...";
         private String distanceText = "0/" + TARGET_DISTANCE + " m";
+        private double nosPercentage = 0.0;
 
-        public void updateDashboard(double timerValue, double carRaceTime, boolean finished, DecimalFormat format) {
+        public void updateDashboard(double timerValue, double carRaceTime, double currentNos, boolean finished,
+                DecimalFormat format) {
             timerText = "Time: " + format.format(timerValue) + " s";
             distanceText = (int) distance + "/" + TARGET_DISTANCE + " m";
+
+            Car c = (Car) carSelector.getSelectedItem();
+            if (c != null) {
+                nosPercentage = currentNos / c.capacityNos;
+            }
+
             if (finished) {
                 raceText = "FINISHED! " + format.format(carRaceTime) + " s";
             } else {
@@ -434,7 +525,7 @@ public class CarSimulationApp extends JFrame {
         }
 
         public void updateDashboard(double timerValue, double carRaceTime, boolean finished) {
-            updateDashboard(timerValue, carRaceTime, finished, timeDf);
+            updateDashboard(timerValue, carRaceTime, currentNos, finished, timeDf);
         }
 
         @Override
@@ -490,7 +581,37 @@ public class CarSimulationApp extends JFrame {
             g2d.setColor(PRIMARY_COLOR);
             g2d.setFont(new Font("Arial", Font.PLAIN, 11));
             g2d.drawString("Max: " + (int) maxSpeedKmH + " km/h", 15, 290);
-            g2d.drawString("Accel: " + accelerationKmHS + " km/h/s", 15, 310);
+            
+            // Real-time acceleration display
+            if (currentActualAccel > accelerationKmHS) {
+                g2d.setColor(new Color(255, 120, 0)); // Highlight orange when using NOS
+            } else if (currentActualAccel < 0) {
+                g2d.setColor(Color.RED); // Highlight red when decelerating
+            } else {
+                g2d.setColor(PRIMARY_COLOR);
+            }
+            g2d.drawString(String.format("Accel: %.1f km/h/s", currentActualAccel), 15, 310);
+            
+            // NOS Progress Bar
+            g2d.setColor(PRIMARY_COLOR);
+            g2d.setFont(new Font("Arial", Font.BOLD, 14));
+            g2d.drawString("NOS", 15, 345);
+            
+            int barX = 55;
+            int barY = 333;
+            int barW = width - barX - 15;
+            int barH = 14;
+            
+            // Background
+            g2d.setColor(new Color(60, 60, 60));
+            g2d.fillRoundRect(barX, barY, barW, barH, 5, 5);
+            
+            // Fill
+            if (nosPercentage > 0) {
+                g2d.setColor(new Color(255, 120, 0)); // NOS color
+                int fillW = (int) (barW * nosPercentage);
+                g2d.fillRoundRect(barX, barY, fillW, barH, 5, 5);
+            }
         }
     }
 
