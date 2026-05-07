@@ -71,7 +71,7 @@ public class CarSimulationApp extends JFrame {
         getContentPane().setBackground(DARK_BG);
         setLayout(new BorderLayout(0, 0));
 
-        loadConfig();
+        loadConfig();    
 
         // Top: Track Panel with modern styling
         trackPanel = new TrackPanel();
@@ -189,7 +189,9 @@ public class CarSimulationApp extends JFrame {
         panel.add(accelerateBtn);
 
         panel.add(Box.createVerticalGlue());
-        return panel;
+      
+        return panel; 
+
     }
 
     private JButton createModernButton(String text, Color bgColor) {
@@ -311,14 +313,57 @@ public class CarSimulationApp extends JFrame {
     }
 
     private void saveRaceResults() {
-        try (PrintWriter writer = new PrintWriter(new FileWriter("resultats.txt", true))) {
-            Car selectedCar = (Car) carSelector.getSelectedItem();
-            String carName = selectedCar != null ? selectedCar.name : "Unknown Car";
-            writer.println("Name: " + carName + ", Distance: " + TARGET_DISTANCE + "m, Time: "
-                    + timeDf.format(carRaceTime) + "s, Max Speed: " + maxSpeedKmH + " km/h");
+        Car selectedCar = (Car) carSelector.getSelectedItem();
+        String carName = selectedCar != null ? selectedCar.name : "Unknown Car";
+        String newResult = "Name: " + carName + ", Distance: " + TARGET_DISTANCE + "m, Time: "
+                + timeDf.format(carRaceTime) + "s, Max Speed: " + maxSpeedKmH + " km/h";
+
+        List<String> results = new ArrayList<>();
+        File file = new File("resultats.txt");
+        if (file.exists()) {
+            try (BufferedReader reader = new BufferedReader(new FileReader(file))) {
+                String line;
+                while ((line = reader.readLine()) != null) {
+                    if (!line.trim().isEmpty()) {
+                        results.add(line);
+                    }
+                }
+            } catch (IOException e) {
+                System.err.println("Error reading results: " + e.getMessage());
+            }
+        }
+
+        results.add(newResult);
+
+        results.sort((r1, r2) -> {
+            try {
+                double t1 = extractTime(r1);
+                double t2 = extractTime(r2);
+                return Double.compare(t1, t2);
+            } catch (Exception e) {
+                return 0;
+            }
+        });
+
+        try (PrintWriter writer = new PrintWriter(new FileWriter(file, false))) {
+            for (String result : results) {
+                writer.println(result);
+            }
         } catch (IOException e) {
             System.err.println("Error saving results: " + e.getMessage());
         }
+    }
+
+    private double extractTime(String resultLine) {
+        String[] parts = resultLine.split(",");
+        for (String part : parts) {
+            part = part.trim();
+            if (part.startsWith("Time:")) {
+                String timeStr = part.substring(5).replace("s", "").trim().replace(",", ".");
+                return Double.parseDouble(timeStr);
+            }
+        }
+        return Double.MAX_VALUE;
     }
 
     private void updateUIState() {

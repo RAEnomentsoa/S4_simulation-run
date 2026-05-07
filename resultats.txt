@@ -1,1 +1,2 @@
-Name: ferrari, Distance: 400m, Time: 8.200s, Max Speed: 200.0 km/h
+Name: porsche, Distance: 400m, Time: 6.017s, Max Speed: 250.0 km/h
+Name: ferrari, Distance: 400m, Time: 7.400s, Max Speed: 200.0 km/h
